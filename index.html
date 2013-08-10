@@ -1,58 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" ng-app>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <link rel="stylesheet" href="css/style.css" />
     <title>g0v Tasks Queue Viewer for Github</title>
     <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
 
     <script>
-    // FIXME hard to maintain
-    var table_header = '<tr><th>Project</th><th>Issue Number</th><th>Title</th><th>State</th><th>Assignee</th><th>Reporter</th><th>Labels</th><th>comments</th></tr>';
-
-
-    function get_table_row(obj, org, repo) {
-        if (typeof obj == "string") {
-            return "Error";
-        }
-        var assignee = "", assignee_avatar ="";
-        var out = "<tr>";
-        var labels = "";
-        for ( index in obj.labels) {
-            // FIXME, better showing
-            labels += obj.labels[index].name + ",";
-        }
-        out += '<td><span class="field">' + org + '/' + repo + '</span></td>';
-        out += '<td><span class="field"><a href="' + obj.html_url + '" target="_blank">' + obj.number + '</a></span></td>';
-        out += '<td><span class="field"><a href="' + obj.html_url + '" target="_blank">' + obj.title + '</a></span></td>';
-        out += '<td><span class="field">' + obj.state + '</span></td>';
-        if (obj.assignee instanceof Object) {
-            assignee = obj.assignee.login;
-            assignee_avatar = obj.assignee.avatar_url;
-        }
-        out += '<td><span class="field"><img class="avatar" src="'+ assignee_avatar +'" />' + assignee + '</span></td>';
-        out += '<td><span class="field"><img class="avatar" src="'+ obj.user.avatar_url +'" />' + obj.user.login + '</span></td>';
-        out += '<td><span class="field">' + labels + '</span></td>';
-        out += '<td><span class="field">' + obj.comments + '</span></td>';
-        out += "</tr>";
-        return out;
-        
-    }
-
-    function get_all_issues_callback(response, org, repo) {
-        var meta = response.meta;
-        var data = response.data;
-        var str_out = "";
-
-
-        $.each(data, function(i, each_issue) {
-           //$(".issues").append('<h3>'+each_issue.number + ':' + each_issue.title+'</h3>');
-            str_out = get_table_row(each_issue, org, repo);
-            $(".issues table tbody").append(str_out);
-        });
-
-    }
-
+    var $issue_arr = new Array();
+    
     function get_github_repos_issues(org, repo) {
         if (!org || !repo) {
             return;
@@ -63,17 +20,31 @@
             dataType: 'jsonp',
             success: function(response) {
                 // FIXME do not pass org and repo into function. Use some other way to get org and repo in each issue.
-                get_all_issues_callback(response, org, repo);
+                get_all_issues_callback(response);
+                
             },
             error: function(err) {
                 console.log(err);
             }
         });
     }
-
-    function go() {
-        $(".issues table tbody").html(table_header);
-        var repos = $("#repo_list").val().split('\n');
+    
+    function get_all_issues_callback(response)
+    {
+        var data = response.data;
+        $issue_arr = $issue_arr.concat(data);
+        var app = document.getElementById('issue_list_control');
+        
+        var scope = angular.element(app).scope();
+        scope.issues = $issue_arr;
+        scope.$apply();
+        
+        
+    }
+    
+    function go()
+    {
+        var repos = $("#repo_list").val().trim().split('\n');
         var org = "";
         var repo = "";
         
@@ -86,12 +57,36 @@
             } else {
                 console.log("Error, no repo");
             }
-
             get_github_repos_issues(org, repo);
         }
     }
 
+    function auth_and_go() {
+        $.ajax({
+            url: "https://api.github.com/authorizations",
+            dataType: 'post',
+            data: {"scopes":["public_repo"],"note": "API script"},
+            success: function(response) {
+                console.log("after auth");  
+                go();
+            },
+            error: function(err) {
+                console.log(err);
+            }
+        });
+
+        
+        //console.log($issue_arr);
+    }
+    
+    function issue_list_control($scope)
+    {
+        $scope.issues = $issue_arr;
+    }
+    
+
     $(function() {
+        //auth_and_go();
         go();
      });
     </script>
@@ -114,7 +109,27 @@ g0v/g0v.tw
     </div>
     <div class="issues">
         <table>
-        <tbody>
+        <tbody id="issue_list_control" ng-controller="issue_list_control">
+            <tr>
+                <th>Project</th>
+                <th>Issue Number</th>
+                <th>Title</th>
+                <th>State</th>
+                <th>Assignee</th>
+                <th>Reporter</th>
+                <th>Labels</th>
+                <th>comments</th>
+            </tr>
+            <tr ng-repeat="issue in issues">
+                <td>{{issue.project}}</td>
+                <td>{{issue.number}}</td>
+                <td>{{issue.title}}</td>
+                <td>{{issue.state}}</td>
+                <td><img src="{{issue.assignee.avatar_url}}" />{{issue.assignee.login}}</td>
+                <td><img src="{{issue.user.avatar_url}}" />{{issue.user.login}}</td>
+                <td><div ng-repeat="label in issue.labels"><span style="color:#{{label.color}};">{{label.name}}</span></div></td>
+                <td>{{issue.comments}}</td>
+            </tr>
         </tbody>
         </table>
     </div>
