@@ -9,18 +9,20 @@
 
     <script>
     var $issue_arr = new Array();
+    var $github_auth_state = false;
+    var $client_id = "f28f25345252f276d729";
+    var $access_token = "";
     
     function get_github_repos_issues(org, repo) {
         if (!org || !repo) {
             return;
         }
-        var github_api_url = 'https://api.github.com/repos/'+org+'/'+repo+'/issues?callback=get_all_issues_callback';
+        var github_api_url = 'https://api.github.com/repos/'+org+'/'+repo+'/issues?callback=get_all_issues_callback&access_token='+$access_token;
         $.ajax({
             url: github_api_url,
             dataType: 'jsonp',
             success: function(response) {
-                // FIXME do not pass org and repo into function. Use some other way to get org and repo in each issue.
-                get_all_issues_callback(response);
+                get_github_repos_issues_callback(response);
                 
             },
             error: function(err) {
@@ -29,7 +31,7 @@
         });
     }
     
-    function get_all_issues_callback(response)
+    function get_github_repos_issues_callback(response)
     {
         var data = response.data;
         $issue_arr = $issue_arr.concat(data);
@@ -42,7 +44,7 @@
         
     }
     
-    function go()
+    function fetch_issue()
     {
         var repos = $("#repo_list").val().trim().split('\n');
         var org = "";
@@ -61,22 +63,8 @@
         }
     }
 
-    function auth_and_go() {
-        $.ajax({
-            url: "https://api.github.com/authorizations",
-            dataType: 'post',
-            data: {"scopes":["public_repo"],"note": "API script"},
-            success: function(response) {
-                console.log("after auth");  
-                go();
-            },
-            error: function(err) {
-                console.log(err);
-            }
-        });
-
-        
-        //console.log($issue_arr);
+    function auth() {
+        window.location = "https://github.com/login/oauth/authorize?client_id="+$client_id;
     }
     
     function issue_list_control($scope)
@@ -84,10 +72,32 @@
         $scope.issues = $issue_arr;
     }
     
+    function fetch_issue_with_oauth() {
+        // empty issue_arr
+        $issue_arr = new Array();
+        if ($access_token) {
+            // Already got the token
+            fetch_issue();
+        } else {
+            var query = window.location.search.substring(1);
+            if (!query) {
+                auth();
+            } else {
+                var query_arr = query.split('=');
+                var field = query_arr[0];
+                if (field === 'access_token') {
+                    $access_token = query_arr[1];
+                    fetch_issue();
+                } else {
+                    console.log('Unexpected');
+                }
+            }
+        }
+    }
+    
 
     $(function() {
-        //auth_and_go();
-        go();
+        fetch_issue_with_oauth();
      });
     </script>
 </head>
@@ -104,7 +114,7 @@ g0v/g0v.tw
             </div>
         </div>
         <div>
-            <button onclick="go()">Update</button>
+            <button onclick="fetch_issue_with_oauth()">Update</button>
         </div>
     </div>
     <div class="issues">
@@ -121,12 +131,12 @@ g0v/g0v.tw
                 <th>comments</th>
             </tr>
             <tr ng-repeat="issue in issues">
-                <td>{{issue.project}}</td>
+                <td>{{issue.html_url}}</td>
                 <td>{{issue.number}}</td>
-                <td>{{issue.title}}</td>
+                <td><a href="{{issue.html_url}}" target="_blank">{{issue.title}}</a></td>
                 <td>{{issue.state}}</td>
-                <td><img src="{{issue.assignee.avatar_url}}" />{{issue.assignee.login}}</td>
-                <td><img src="{{issue.user.avatar_url}}" />{{issue.user.login}}</td>
+                <td><img src="{{issue.assignee.avatar_url}}" class="avatar" />{{issue.assignee.login}}</td>
+                <td><img src="{{issue.user.avatar_url}}" class="avatar" />{{issue.user.login}}</td>
                 <td><div ng-repeat="label in issue.labels"><span style="color:#{{label.color}};">{{label.name}}</span></div></td>
                 <td>{{issue.comments}}</td>
             </tr>
