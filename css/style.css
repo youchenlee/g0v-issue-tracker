@@ -1,0 +1,13 @@
+.field {
+    font-weight: normal;
+}
+
+table, th, td
+{
+    border: 1px solid gray;
+}
+
+.avatar {
+    width: 30px;
+    height: 30px;
+}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <title>g0v Tasks Queue Viewer for Github</title>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+
+    <script>
+    // FIXME hard to maintain
+    var table_header = '<tr><th>Project</th><th>Issue Number</th><th>Title</th><th>State</th><th>Assignee</th><th>Reporter</th><th>Labels</th><th>comments</th></tr>';
+
+
+    function get_table_row(obj, org, repo) {
+        if (typeof obj == "string") {
+            return "Error";
+        }
+        var assignee = "", assignee_avatar ="";
+        var out = "<tr>";
+        var labels = "";
+        for ( index in obj.labels) {
+            // FIXME, better showing
+            labels += obj.labels[index].name + ",";
+        }
+        out += '<td><span class="field">' + org + '/' + repo + '</span></td>';
+        out += '<td><span class="field"><a href="' + obj.html_url + '" target="_blank">' + obj.number + '</a></span></td>';
+        out += '<td><span class="field"><a href="' + obj.html_url + '" target="_blank">' + obj.title + '</a></span></td>';
+        out += '<td><span class="field">' + obj.state + '</span></td>';
+        if (obj.assignee instanceof Object) {
+            assignee = obj.assignee.login;
+            assignee_avatar = obj.assignee.avatar_url;
+        }
+        out += '<td><span class="field"><img class="avatar" src="'+ assignee_avatar +'" />' + assignee + '</span></td>';
+        out += '<td><span class="field"><img class="avatar" src="'+ obj.user.avatar_url +'" />' + obj.user.login + '</span></td>';
+        out += '<td><span class="field">' + labels + '</span></td>';
+        out += '<td><span class="field">' + obj.comments + '</span></td>';
+        out += "</tr>";
+        return out;
+        
+    }
+
+    function get_all_issues_callback(response, org, repo) {
+        var meta = response.meta;
+        var data = response.data;
+        var str_out = "";
+
+
+        $.each(data, function(i, each_issue) {
+           //$(".issues").append('<h3>'+each_issue.number + ':' + each_issue.title+'</h3>');
+            str_out = get_table_row(each_issue, org, repo);
+            $(".issues table tbody").append(str_out);
+        });
+
+    }
+
+    function get_github_repos_issues(org, repo) {
+        if (!org || !repo) {
+            return;
+        }
+        var github_api_url = 'https://api.github.com/repos/'+org+'/'+repo+'/issues?callback=get_all_issues_callback';
+        $.ajax({
+            url: github_api_url,
+            dataType: 'jsonp',
+            success: function(response) {
+                // FIXME do not pass org and repo into function. Use some other way to get org and repo in each issue.
+                get_all_issues_callback(response, org, repo);
+            },
+            error: function(err) {
+                console.log(err);
+            }
+        });
+    }
+
+    function go() {
+        $(".issues table tbody").html(table_header);
+        var repos = $("#repo_list").val().split('\n');
+        var org = "";
+        var repo = "";
+        
+        // TODO parallel fetch & display
+        for (var i = 0; i < repos.length; i++) { 
+            repo_paths = repos[i].split('/');
+            if (repo_paths.length == 2) {
+                org = repo_paths[0];
+                repo = repo_paths[1];
+            } else {
+                console.log("Error, no repo");
+            }
+
+            get_github_repos_issues(org, repo);
+        }
+    }
+
+    $(function() {
+        go();
+     });
+    </script>
+</head>
+<body>
+    <h2>g0v Tasks Queue Viewer for Github</h2>
+    <div>
+        <div>
+            <span>{org}/{repo}, one pre line</span>
+            <div>
+            <textarea id="repo_list" type="text" name="repo_list" style="height: 100px;">
+g0v/hack.g0v.tw
+g0v/g0v.tw
+            </textarea>
+            </div>
+        </div>
+        <div>
+            <button onclick="go()">Update</button>
+        </div>
+    </div>
+    <div class="issues">
+        <table>
+        <tbody>
+        </tbody>
+        </table>
+    </div>
+</body>
+</html>
