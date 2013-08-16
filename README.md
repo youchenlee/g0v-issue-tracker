@@ -10,3 +10,6 @@
 ## Note
  * This project will be transfered to g0v group in github.
 
+## License: The MIT License (MIT)
+ * http://g0v.mit-license.org/
+
